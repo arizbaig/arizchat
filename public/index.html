@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ariz's Chatbot</title>
+  <!-- Tailwind via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' };
+  </script>
+  <style>
+    .scroll-smooth { scroll-behavior: smooth; }
+    .bubble { max-width: 80%; border-radius: 1rem; padding: .625rem .875rem; }
+    .typing { display: inline-flex; gap: 4px; align-items: center; }
+    .typing span { width: 6px; height: 6px; border-radius: 9999px; display: inline-block; animation: blink 1.2s infinite ease-in-out; }
+    .typing span:nth-child(2){ animation-delay: .2s }
+    .typing span:nth-child(3){ animation-delay: .4s }
+    @keyframes blink { 0%, 80%, 100% { opacity: .2 } 40% { opacity: 1 } }
+
+    @media (max-width: 768px) {
+      .composer { position: sticky; bottom: 0; left: 0; right: 0; }
+      .composer-inner { border-radius: 1rem; }
+    }
+    @media (min-width: 769px) {
+      .composer { position: sticky; bottom: 0; }
+      .composer-inner { border-radius: 1rem; }
+    }
+
+    ::selection { background: rgba(59,130,246,.25); }
+    .soft-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.08); }
+  </style>
+</head>
+<body class="h-full bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+  <div id="app" class="min-h-screen grid grid-rows-[auto,1fr,auto]">
+    <!-- Header -->
+    <header class="sticky top-0 z-20 backdrop-blur bg-white/70 dark:bg-zinc-950/70 border-b border-zinc-200 dark:border-zinc-800">
+      <div class="mx-auto max-w-4xl px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="size-8 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-500"></div>
+          <h1 class="text-lg sm:text-xl font-semibold">Ariz's Chatbot</h1>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="themeToggle" class="rounded-xl px-3 py-2 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900" title="Toggle theme" aria-label="Toggle theme">🌓</button>
+          <button id="clearChat" class="rounded-xl px-3 py-2 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900" title="Clear chat" aria-label="Clear chat">🗑️</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Chat area -->
+    <main class="mx-auto max-w-4xl w-full px-4 py-4 sm:py-6">
+      <div id="chat" class="scroll-smooth space-y-4">
+        <div class="flex gap-3 items-start">
+          <div class="shrink-0 size-9 rounded-full bg-gradient-to-br from-indigo-500 to-blue-500"></div>
+          <div class="bubble bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+            <p class="leading-relaxed">Hello! I'm <strong>Ariz's Chatbot</strong>. Ask anything — I can reply in English or Urdu. ✨</p>
+          </div>
+        </div>
+      </div>
+      <div id="spacer" class="h-24"></div>
+    </main>
+
+    <!-- Composer -->
+    <div class="composer bg-gradient-to-t from-zinc-50 via-zinc-50/70 to-transparent dark:from-zinc-950 dark:via-zinc-950/60">
+      <div class="mx-auto max-w-4xl px-4 pb-4">
+        <div class="composer-inner soft-shadow border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 sm:p-3 flex items-end gap-2">
+          <textarea id="input" rows="1" placeholder="Write a message…" class="flex-1 resize-none bg-transparent outline-none placeholder-zinc-400 max-h-40 leading-relaxed"></textarea>
+          <button id="send" class="rounded-xl px-4 py-2 bg-blue-600 text-white font-medium hover:opacity-90 active:opacity-100">Send</button>
+        </div>
+        <div class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">Pro tip: Use Shift+Enter for multi-line messages.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Theme toggle
+    const THEME_KEY = 'ariz_theme';
+    const root = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    const applyTheme = (t) => { t === 'dark' ? root.classList.add('dark') : root.classList.remove('dark'); localStorage.setItem(THEME_KEY, t); };
+    applyTheme(localStorage.getItem(THEME_KEY) || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+    themeToggle.addEventListener('click', () => applyTheme(root.classList.contains('dark') ? 'light' : 'dark'));
+
+    // Chat logic (calls your backend /chat)
+    const chat = document.getElementById('chat');
+    const input = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    const clearBtn = document.getElementById('clearChat');
+    const messages = [
+      { role: 'system', content: "You are Ariz's helpful bilingual assistant. Keep replies clear and concise. If the user writes in Urdu, reply in Urdu." }
+    ];
+
+    function autoResizeTextarea(el){ el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 160) + 'px'; }
+    input.addEventListener('input', () => autoResizeTextarea(input));
+
+    function addBubble(role, html){
+      const wrap = document.createElement('div');
+      wrap.className = 'flex gap-3 items-start ' + (role==='user' ? 'justify-end' : '');
+      const avatar = document.createElement('div');
+      avatar.className = 'shrink-0 size-9 rounded-full ' + (role==='user' ? 'bg-gradient-to-br from-pink-500 to-rose-500 order-2' : 'bg-gradient-to-br from-indigo-500 to-blue-500');
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble border ' + (role==='user' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800');
+      bubble.innerHTML = html;
+      if(role==='user') { wrap.appendChild(bubble); wrap.appendChild(avatar); } else { wrap.appendChild(avatar); wrap.appendChild(bubble); }
+      chat.appendChild(wrap);
+      chat.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      return bubble;
+    }
+
+    function addTyping(){ return addBubble('assistant', '<div class="typing"><span class="bg-zinc-400 dark:bg-zinc-500"></span><span class="bg-zinc-400 dark:bg-zinc-500"></span><span class="bg-zinc-400 dark:bg-zinc-500"></span></div>'); }
+
+    async function sendMessage(){
+      const text = input.value.trim();
+      if(!text) return;
+      input.value = ''; autoResizeTextarea(input);
+
+      addBubble('user', escapeHtml(text));
+      const typingBubble = addTyping();
+
+      messages.push({ role: 'user', content: text });
+
+      try {
+        const res = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages })
+        });
+        if(!res.ok){
+          const errText = await res.text();
+          throw new Error(`API error ${res.status}: ${errText}`);
+        }
+        const data = await res.json();
+        const reply = data?.choices?.[0]?.message?.content?.trim() || '...';
+        messages.push({ role: 'assistant', content: reply });
+        await typeInto(typingBubble, reply);
+      } catch (e){
+        console.error(e);
+        typingBubble.innerHTML = `<span class="text-red-600 dark:text-red-400">❌ ${escapeHtml(e.message)}</span>`;
+      }
+    }
+
+    function sleep(ms){ return new Promise(r => setTimeout(r, ms)) }
+    async function typeInto(el, text){
+      el.innerHTML = '';
+      const pre = document.createElement('div');
+      pre.className = 'whitespace-pre-wrap';
+      el.appendChild(pre);
+      for(let i=0;i<text.length;i++){
+        pre.textContent += text[i];
+        await sleep(text.length > 800 ? 4 : 12);
+        chat.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    }
+
+    function escapeHtml(str){ return str.replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[ch])); }
+
+    sendBtn.addEventListener('click', sendMessage);
+    input.addEventListener('keydown', (e) => { if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); } });
+
+    clearBtn.addEventListener('click', () => {
+      const keep = chat.firstElementChild; chat.innerHTML = ''; if(keep) chat.appendChild(keep);
+      for(let i=messages.length-1;i>=0;i--){ if(messages[i].role !== 'system') messages.splice(i,1); }
+    });
+  </script>
+</body>
+</html>
