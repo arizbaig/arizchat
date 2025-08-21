@@ -1,16 +1,17 @@
-import fetch from "node-fetch";
+// Netlify functions Node 18+ mein fetch already hota hai, node-fetch ki zaroorat nahi hai
+// Lekin agar tum old version use kar rahe ho to node-fetch import rehne do
 
 export async function handler(event) {
   try {
-    const body = JSON.parse(event.body);
+    const body = JSON.parse(event.body || "{}");
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        // ✅ direct key (sirf project/learning ke liye)
-        "Authorization": `Bearer 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`,
+        // ⚠️ API key ko env variable mein rakhna best hai (netlify.toml ya Netlify dashboard)
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://your-site.netlify.app/",
+        "HTTP-Referer": "https://chatariz1.netlify.app/",
         "X-Title": "Ariz's Chatbot"
       },
       body: JSON.stringify({
