@@ -110,62 +110,31 @@
     function addTyping(){ return addBubble('assistant', '<div class="typing"><span class="bg-zinc-400 dark:bg-zinc-500"></span><span class="bg-zinc-400 dark:bg-zinc-500"></span><span class="bg-zinc-400 dark:bg-zinc-500"></span></div>'); }
 
     async function sendMessage(){
-      const text = input.value.trim();
-      if(!text) return;
-      input.value = ''; autoResizeTextarea(input);
+  const text = input.value.trim();
+  if(!text) return;
+  input.value = ''; autoResizeTextarea(input);
 
-      addBubble('user', escapeHtml(text));
-      const typingBubble = addTyping();
+  addBubble('user', escapeHtml(text));
+  const typingBubble = addTyping();
 
-      messages.push({ role: 'user', content: text });
+  messages.push({ role: 'user', content: text });
 
-      try {
-        const res = await fetch('/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages })
-        });
-        if(!res.ok){
-          const errText = await res.text();
-          throw new Error(`API error ${res.status}: ${errText}`);
-        }
-        const data = await res.json();
-        const reply = data?.choices?.[0]?.message?.content?.trim() || '...';
-        messages.push({ role: 'assistant', content: reply });
-        await typeInto(typingBubble, reply);
-      } catch (e){
-        console.error(e);
-        typingBubble.innerHTML = `<span class="text-red-600 dark:text-red-400">❌ ${escapeHtml(e.message)}</span>`;
-      }
-    }
-
-    function sleep(ms){ return new Promise(r => setTimeout(r, ms)) }
-    async function typeInto(el, text){
-      el.innerHTML = '';
-      const pre = document.createElement('div');
-      pre.className = 'whitespace-pre-wrap';
-      el.appendChild(pre);
-      for(let i=0;i<text.length;i++){
-        pre.textContent += text[i];
-        await sleep(text.length > 800 ? 4 : 12);
-        chat.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-      }
-    }
-
-    function escapeHtml(str){ return str.replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[ch])); }
-
-    sendBtn.addEventListener('click', sendMessage);
-    input.addEventListener('keydown', (e) => { if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); } });
-
-    clearBtn.addEventListener('click', () => {
-      const keep = chat.firstElementChild; chat.innerHTML = ''; if(keep) chat.appendChild(keep);
-      for(let i=messages.length-1;i>=0;i--){ if(messages[i].role !== 'system') messages.splice(i,1); }
+  try {
+    const res = await fetch('/api/chat', {   // ✅ FIXED
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages })
     });
-  </script>
-</body>
-</html>
-const res = await fetch('/.netlify/functions/chat', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ messages })
-});
+    if(!res.ok){
+      const errText = await res.text();
+      throw new Error(`API error ${res.status}: ${errText}`);
+    }
+    const data = await res.json();
+    const reply = data?.choices?.[0]?.message?.content?.trim() || '...';
+    messages.push({ role: 'assistant', content: reply });
+    await typeInto(typingBubble, reply);
+  } catch (e){
+    console.error(e);
+    typingBubble.innerHTML = `<span class="text-red-600 dark:text-red-400">❌ ${escapeHtml(e.message)}</span>`;
+  }
+}
